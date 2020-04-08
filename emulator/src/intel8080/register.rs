@@ -20,7 +20,7 @@ pub struct Register {
 }
 
 // B, C, D, E, H, L can be used as 8 bit registers or
-// they can be paired in 16 bit registers (BC, DE, HL)
+// they can be paired  16 bit registers (BC, DE, HL)
 // the following implementation allows to use BD, DE and HL registers
 impl Register {
     pub fn get_bc(&self) -> u16 {
@@ -33,6 +33,10 @@ impl Register {
 
     pub fn get_hl(&self) -> u16 {
         ((self.h as u16) << 8) | (self.l as u16)
+    }
+
+    pub fn get_af(&self) -> u16 {
+        ((self.a as u16) << 8) | (self.f as u16)
     }
 
     pub fn set_bc(&mut self, value: u16) {
@@ -49,13 +53,18 @@ impl Register {
         self.h = (value >> 8) as u8;
         self.l = (value & 0x00ff) as u8;
     }
+
+    pub fn set_af(&mut self, value: u16) {
+        self.a = (value >> 8) as u8;
+        self.f = (value & 0x00d5 | 0x0002) as u8;
+    }
 }
 
 // This enum represents the flags that the F register
 // contains
 // Sign: 1 if result is negative
 // Zero: 1 if result is 0
-// Parity: 1 if the number of 1 bit in the result is even
+// Parity: 1 if the number of 1 bit  the result is even
 // Carry: 1 if the last addition/subtraction had a carry/borrow
 // AC aka Auxiliary Carry: used for binary-coded decimal arithmetic
 // See: https://en.wikipedia.org/wiki/Intel_8080#Flags
