@@ -1,17 +1,22 @@
+extern crate log;
+
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::mem;
+use log::{debug};
 
 use super::bit;
 use super::register::Register;
 use super::register::Flags;
 use super::memory::Memory;
+use super::disassembler::get_mnemonic;
 
- struct Cpu {
-    register: Register,
-    memory: Rc<RefCell<Memory>>,
-    stop: bool,
-    interrupt: bool
+
+pub struct Cpu {
+    pub register: Register,
+    pub memory: Rc<RefCell<dyn Memory>>,
+    pub stop: bool,
+    pub interrupt: bool
 }
 
 //This impl block implements Arithmetic Group operations
@@ -27,8 +32,8 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, (a & 0x0f) + (value & 0x0f) > 0x0f);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
-        self.register.set_flag(Flags::Carry, (a as u16) + (value as u16) > 0xff);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
+        self.register.set_flag(Flags::Carry, u16::from(a) + u16::from(value) > 0xff);
         self.register.a = result;
     }
 
@@ -44,8 +49,8 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, (a & 0x0f) + (value & 0x0f) + c > 0x0f);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
-        self.register.set_flag(Flags::Carry, (a as u16) + (value as u16) + (c as u16) > 0xff);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
+        self.register.set_flag(Flags::Carry, u16::from(a) + u16::from(value) + u16::from(c) > 0xff);
         self.register.a = result;
     }
 
@@ -59,9 +64,9 @@ impl Cpu {
         let result = a.wrapping_sub(value);
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
-        self.register.set_flag(Flags::AC, (a as i8 & 0x0f) - (value as i8 & 0x0f) >= 0);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
-        self.register.set_flag(Flags::Carry, (a as u16) < (value as u16));
+        self.register.set_flag(Flags::AC, (a as i8 & 0x0f) - (value as i8 & 0x0f) >= 0x00);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
+        self.register.set_flag(Flags::Carry, u16::from(a) < u16::from(value));
         self.register.a = result;
     }
 
@@ -77,8 +82,8 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, (a as i8 & 0x0f) - (value as i8 & 0x0f) - (c as i8) >= 0);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
-        self.register.set_flag(Flags::Carry, (a as u16) < ((value as u16) + (c as u16)));
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
+        self.register.set_flag(Flags::Carry, u16::from(a) < u16::from(value) + u16::from(c));
         self.register.a = result;
     }
 
@@ -92,7 +97,7 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, (value & 0x0f) + 0x01 > 0x0f);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
         result
     }
 
@@ -161,8 +166,8 @@ impl Cpu {
         let result = a & value;
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
-        self.register.set_flag(Flags::AC, ((a | value) & 0x08) != 0x0);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
+        self.register.set_flag(Flags::AC, ((a | value) & 0x08) != 0x00);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
         self.register.set_flag(Flags::Carry, false);
         self.register.a = result;
     }
@@ -179,7 +184,7 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, false);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
         self.register.set_flag(Flags::Carry, false);
         self.register.a = result;
     }
@@ -196,7 +201,7 @@ impl Cpu {
         self.register.set_flag(Flags::Zero, result == 0x00);
         self.register.set_flag(Flags::Sign, bit::get(result, 7));
         self.register.set_flag(Flags::AC, false);
-        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0);
+        self.register.set_flag(Flags::Parity, result.count_ones() & 0x01 == 0x00);
         self.register.set_flag(Flags::Carry, false);
         self.register.a = result;
     }
@@ -254,7 +259,7 @@ impl Cpu {
     fn alu_rar(&mut self) {
         let lsb = bit::get(self.register.a, 0);
         self.register.a = if self.register.get_flag(Flags::Carry) {
-            (self.register.a >> 1) & 0x80
+            (self.register.a >> 1) | 0x80
         }
         else{
             self.register.a >> 1
@@ -294,8 +299,8 @@ impl Cpu {
     // LDA
     //NO ARE FLAGS AFFECTED
     fn alu_lda(&mut self) {
-        let word = self.get_next_word() as usize;
-        let value = self.memory.borrow().get(word);
+        let word = self.get_next_word();
+        let value = self.memory.borrow().get(usize::from(word));
         self.register.a = value;
     }
 
@@ -305,8 +310,8 @@ impl Cpu {
     //NO ARE FLAGS AFFECTED
     fn alu_sta(&mut self) {
         let value = self.register.a;
-        let idx = self.get_next_word() as usize;
-        self.memory.borrow_mut().set(idx, value);
+        let idx = self.get_next_word();
+        self.memory.borrow_mut().set(usize::from(idx), value);
     }
 
     //Load H and L direct: (HL) = Memory[(byte3)(byte2)]
@@ -314,8 +319,8 @@ impl Cpu {
     // LHLD
     //NO FLAGS ARE AFFECTED
     fn alu_lhld(&mut self) {
-        let index = self.get_next_word() as usize;
-        let value = self.memory.borrow().get_word(index);
+        let index = self.get_next_word();
+        let value = self.memory.borrow().get_word(usize::from(index));
         self.register.set_hl(value);
     }
 
@@ -324,9 +329,9 @@ impl Cpu {
     // SHLD
     //NO FLAGS ARE AFFECTED
     fn alu_shld(&mut self) {
-        let index = self.get_next_word() as usize;
+        let index = self.get_next_word();
         let value = self.register.get_hl();
-        self.memory.borrow_mut().set_word(index, value);
+        self.memory.borrow_mut().set_word(usize::from(index), value);
     }
 
     //Load accumulator indirec: A = Memory[rp] rp can be either HL or DE
@@ -334,8 +339,8 @@ impl Cpu {
     // LDAX
     //NO FLAGS ARE AFFECTED
     fn alu_ldax(&mut self, index: u16) {
-        let index = index as usize;
-        self.register.a = self.memory.borrow().get(index);
+        let index = index;
+        self.register.a = self.memory.borrow().get(usize::from(index));
     }
 
     //Store accumulator indirect: Memory[rp] = A rp can be either HL or DE
@@ -343,7 +348,7 @@ impl Cpu {
     // STAX
     //NO FLAGS ARE AFFECTED
     fn alu_stax(&mut self, index: u16) {
-        self.memory.borrow_mut().set(index as usize, self.register.a);
+        self.memory.borrow_mut().set(usize::from(index), self.register.a);
     }
 
     //Exchange H and L with D and E: H = D, L = E, D = H, L = E
@@ -440,11 +445,11 @@ impl Cpu {
     //NO FLAGS ARE AFFECTED
     fn alu_xthl(&mut self) {
         let mut mem = self.memory.borrow_mut();
-        let sp = mem.get_word(self.register.sp as usize);
+        let sp = mem.get_word(usize::from(self.register.sp));
         let hl = self.register.get_hl();
 
         self.register.set_hl(sp);
-        mem.set_word(self.register.sp as usize, hl);
+        mem.set_word(usize::from(self.register.sp), hl);
     }
 }
 
@@ -452,33 +457,33 @@ impl Cpu {
 impl Cpu {
     fn stack_push(&mut self, value: u16) {
         self.register.sp = self.register.sp.wrapping_sub(2);
-        self.memory.borrow_mut().set_word(self.register.sp as usize, value);
+        self.memory.borrow_mut().set_word(usize::from(self.register.sp), value);
     }
 
     fn stack_pop(&mut self) -> u16 {
-        let result = self.memory.borrow().get_word(self.register.sp as usize);
+        let result = self.memory.borrow().get_word(usize::from(self.register.sp));
         self.register.sp = self.register.sp.wrapping_add(2);
         result
     }
 
     fn set_m(&self, value: u8) {
         let index = self.register.get_hl();
-        self.memory.borrow_mut().set(index as usize, value);
+        self.memory.borrow_mut().set(usize::from(index), value);
     }
 
     fn get_m(&self) -> u8 {
         let index = self.register.get_hl();
-        self.memory.borrow().get(index as usize)
+        self.memory.borrow().get(usize::from(index))
     }
 
     fn get_next_byte(&mut self) -> u8 {
-        let value = self.memory.borrow().get(self.register.pc as usize);
+        let value = self.memory.borrow().get(usize::from(self.register.pc));
         self.register.pc += 1;
         value
     }
 
     fn get_next_word(&mut self) -> u16 {
-        let value = self.memory.borrow().get_word(self.register.pc as usize);
+        let value = self.memory.borrow().get_word(usize::from(self.register.pc));
         self.register.pc += 2;
         value
     }
@@ -486,8 +491,33 @@ impl Cpu {
 
 // This impl block implements how the Cpu will be used and will handle the opcodes
 impl Cpu {
+    pub fn new(memory: Rc<RefCell<dyn Memory>>) -> Self {
+        Self {
+            register: Register::new(),
+            memory,
+            stop: false,
+            interrupt: false
+        }
+    }
+
     pub fn next(&mut self) {
-        let opcode = 1;
+        let opcode = self.get_next_byte();
+
+        debug!(
+            "IN  {:04x} {} PC={:04x} SP={:04x} A={:02x} F={:02x} B={:02x} C={:02x} D={:02x} E={:02x} H={:02x} L={:02x}",
+            opcode,
+            get_mnemonic(opcode),
+            self.register.pc.wrapping_sub(1),
+            self.register.sp,
+            self.register.a,
+            self.register.f,
+            self.register.b,
+            self.register.c,
+            self.register.d,
+            self.register.e,
+            self.register.h,
+            self.register.l
+        );
 
         match opcode {
             0x00 => { },                                                                //NOP
@@ -728,7 +758,7 @@ impl Cpu {
             0xd5 => self.stack_push(self.register.get_de()),                            //PUSH  BD  PUSH REGISTER PAIR DE ON TOP OF THE STACK
             0xd6 => {                                                                   //SBB   #$  SUB data TO ACCUMULATOR
                 let value = self.get_next_byte();
-                self.alu_sbb(value);  
+                self.alu_sub(value);  
             },                                 
             0xd7 => self.alu_rst(2),                                                    //RST   2   RESET 2
             0xd8 => self.alu_ret(self.register.get_flag(Flags::Carry)),                 //RC        RETURN IF CARRY
@@ -788,7 +818,33 @@ impl Cpu {
                 self.alu_cmp(value);
             },                                 
             0xff => self.alu_rst(7),                                                    //RST   7   RESET 7
-            _ => {},
+            _ => unimplemented!(),
         };
+
+        debug!(
+            "OUT {:04x} {} PC={:04x} SP={:04x} A={:02x} F={:02x} B={:02x} C={:02x} D={:02x} E={:02x} H={:02x} L={:02x}",
+            opcode,
+            get_mnemonic(opcode),
+            self.register.pc.wrapping_sub(1),
+            self.register.sp,
+            self.register.a,
+            self.register.f,
+            self.register.b,
+            self.register.c,
+            self.register.d,
+            self.register.e,
+            self.register.h,
+            self.register.l
+        );
+    }
+
+    pub fn interrupt_handler(&mut self, addr: u16) {
+        if !self.interrupt{
+            return;
+        }
+
+        self.interrupt = false;
+        self.stack_push(self.register.pc);
+        self.register.pc = addr;
     }
 }

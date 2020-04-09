@@ -6,6 +6,7 @@ use super::bit;
 // SP is the stack pointer
 // PC is the program counter
 // See: https://en.wikipedia.org/wiki/Intel_8080#Registers
+#[derive(Default)]
 pub struct Register {
     pub a: u8,
     pub f: u8,      //Flags
@@ -19,24 +20,32 @@ pub struct Register {
     pub pc: u16,    //Program Counter
 }
 
+impl Register {
+    pub fn new() -> Self {
+        let mut register = Self::default();
+        register.f = 0b0000_0010;
+        register
+    }
+}
+
 // B, C, D, E, H, L can be used as 8 bit registers or
 // they can be paired  16 bit registers (BC, DE, HL)
 // the following implementation allows to use BD, DE and HL registers
 impl Register {
     pub fn get_bc(&self) -> u16 {
-        ((self.b as u16) << 8) | (self.c as u16)
+        (u16::from(self.b) << 8) | u16::from(self.c)
     }
 
     pub fn get_de(&self) -> u16 {
-        ((self.d as u16) << 8) | (self.e as u16)
+        (u16::from(self.d) << 8) | u16::from(self.e)
     }
 
     pub fn get_hl(&self) -> u16 {
-        ((self.h as u16) << 8) | (self.l as u16)
+        (u16::from(self.h) << 8) | u16::from(self.l)
     }
 
     pub fn get_af(&self) -> u16 {
-        ((self.a as u16) << 8) | (self.f as u16)
+        (u16::from(self.a) << 8) | u16::from(self.f)
     }
 
     pub fn set_bc(&mut self, value: u16) {

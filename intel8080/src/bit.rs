@@ -1,5 +1,5 @@
 pub fn get(byte: u8, pos: usize) -> bool {
-    ((byte >> pos) & 1) != 0
+    (byte & (1 << pos)) != 0
 }
 
 pub fn set(byte: u8, pos: usize) -> u8 {
